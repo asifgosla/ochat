@@ -2,7 +2,7 @@ cc_binary(
     name = "ochat",
     srcs = [
         "app_config.h",
-        "rest_client.cpp",
+        "ochat.cpp",
     ],
     copts = [
     ],
