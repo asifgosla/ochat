@@ -11,8 +11,3 @@ cc_binary(
         "@cpp-httplib//:cpp-httplib",
     ],
 )
-
-cc_binary(
-    name = "temp",
-    srcs = ["temp.cpp"],
-)
