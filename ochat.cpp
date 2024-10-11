@@ -2,9 +2,9 @@
 #include <httplib.h>
 
 #include <algorithm>
-#include <boost/json/src.hpp>  // must include from 1 source file, to eliminate need to link to boost
+#include <boost/json/src.hpp> // must include from 1 source file, to eliminate need to link to boost
 #include <iostream>
-#include <stdexcept>  // Include for std::runtime_error
+#include <stdexcept> // Include for std::runtime_error
 #include <string>
 
 #include "app_config.h"
@@ -48,7 +48,7 @@ string SendRequestToAi(const string &req) {
   std::stringstream ss;
   ss << "{"
      << "  \"model\": \"" << aiModel << "\","
-     << "  \"streaming\": false,"
+     << "  \"stream\": false,"
      << " \"messages\": ["
      << "   { \"role\": \"user\", " << "  \"content\": \"" << prompt << "\" }"
      << "  ]"
@@ -64,8 +64,10 @@ string SendRequestToAi(const string &req) {
   // check for error sending the post request
   if (status.error() != httplib::Error::Success) {
     stringstream err;
-    err << "Error making request to " << OLLAMA_SERVER_ADDR << ":"
-        << OLLAMA_SERVER_PORT << endl;
+    err << COLOR::ATTN << "Error making request to " << OLLAMA_SERVER_ADDR
+        << ":" << OLLAMA_SERVER_PORT << COLOR::DEFAULT << endl;
+    err << COLOR::ATTN << "- Make sure that the Ollama service is running"
+        << COLOR::DEFAULT << endl;
     throw std::runtime_error(err.str());
   }
 
@@ -98,7 +100,8 @@ string SendRequestToAi(const string &req) {
           // converts the escape sequences (such as \n) appropriately.
           std::string rc = respChunk->c_str();
           output << rc;
-          if (g_debug) cout << line_num << ": " << *respChunk << endl;
+          if (g_debug)
+            cout << line_num << ": " << *respChunk << endl;
         }
       }
     }
@@ -110,16 +113,6 @@ string SendRequestToAi(const string &req) {
 }
 
 int main() {
-  // Initial connection and basic intro from AI
-  cout << COLOR::APP << "Initiating connection to Ollama model..." << AI_MODEL
-       << COLOR::DEFAULT << endl;
-  try {
-    string resp = SendRequestToAi("Introduce yourself?");
-    cout << COLOR::AI << "AI: " << resp << COLOR::DEFAULT << endl;
-  } catch (const std::runtime_error &e) {
-    std::cerr << "Exception: " << e.what() << std::endl;
-  }
-
   /// Initiate loop to handle user input and AI response
   cout << COLOR::APP << "Please enter a prompt for the AI or " << COLOR::ATTN
        << "/bye" << COLOR::APP << " to exit" << COLOR::DEFAULT << endl;
