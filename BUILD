@@ -4,8 +4,7 @@ cc_binary(
         "app_config.h",
         "ochat.cpp",
     ],
-    copts = [
-    ],
+    copts = ["-std=c++20"],
     deps = [
         "@boost.json//:boost.json",
         "@cpp-httplib//:cpp-httplib",
