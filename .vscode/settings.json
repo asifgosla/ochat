@@ -93,6 +93,10 @@
     "execution": "cpp",
     "ios": "cpp",
     "locale": "cpp",
-    "print": "cpp"
-  }
+    "print": "cpp",
+    "__config": "cpp",
+    "__node_handle": "cpp",
+    "version": "cpp"
+  },
+  "C_Cpp.default.compilerPath": "/usr/bin/gcc"
 }
