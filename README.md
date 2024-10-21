@@ -17,6 +17,8 @@ Additionally it demonstrates the use of C++ and the Bazel build system.
 
 ## Dependencies
 
+- bazel is required to build this project.
+  - refer to this [link](https://github.com/asifgosla/gtest-example?tab=readme-ov-file#install-bazel) for installation instructions.
 - boost::asio, boost::json - this will automatically be installed by bazel when building the project.
 - ollama - this can be downloaded from https://ollama.ai/download and needs to be installed locally.
 
