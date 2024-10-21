@@ -3,21 +3,22 @@
 ## Overview
 
 A C++ application to chat with an LLM using Ollama.<br>
-This application demonstrates calling an Ollama REST API and processing the JSON response.
+This command line application demonstrates calling an Ollama REST API, receiving the chunked post response, and processing the JSON response.
 Additionally it demonstrates the use of C++ and the Bazel build system.
 
 ## Technologies
 
-- C++, C++17
-- REST API client (using cpp-httplib)
+- C++, C++17, C++20
+- REST API client (using boost::asio)
+  - includes handling chunked response from Ollama.
 - JSON (using boost::json)
 - Bazel
 - Ollama
 
 ## Dependencies
 
-- cpp-httplib
-- boost::json
+- boost::asio, boost::json - this will automatically be installed by bazel when building the project.
+- ollama - this can be downloaded from https://ollama.ai/download and needs to be installed locally.
 
 ## License
 
