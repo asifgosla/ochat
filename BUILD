@@ -7,6 +7,6 @@ cc_binary(
     copts = ["-std=c++20"],
     deps = [
         "@boost.json//:boost.json",
-        "@cpp-httplib//:cpp-httplib",
+        "@boost.asio//:boost.asio",
     ],
 )

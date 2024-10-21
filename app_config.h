@@ -24,4 +24,7 @@ constexpr const char *USER = USE_COLORS ? "\033[0m" : "";    // default
 constexpr const char *DEFAULT = USE_COLORS ? "\033[0m" : ""; // default
 }; // namespace COLOR
 
+#define _STRINGIFY(x) #x
+#define STRINGIFY(x) _STRINGIFY(x)
+
 #endif /* APP_CONFIG_H */
