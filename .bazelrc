@@ -1,1 +1,7 @@
-build --action_env=BAZEL_CXXOPTS="-std=c++20"
+# Set default C++ standard for builds
+
+build --action_env=BAZEL_CXXOPTS="-std=c++20" --cxxopt=-std=c++20
+
+# Set default C++ standard for all cc_test targets
+
+test --copt=-std=c++20

@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+#include "ochat.h"
+
 using namespace std;
 using boost::asio::ip::tcp;
 
@@ -32,14 +34,13 @@ std::string format_post_request(std::string prompt, std::string model_name,
   std::stringstream ss;
 
   ss << "{"
-     << "  \"model\": \"" << g_opt.model << "\","
+     << "  \"model\": \"" << model_name << "\","
      << "  \"stream\": " << (stream_resp ? "true" : "false") << ","
-     << " \"messages\": [" << endl;
+     << " \"messages\": [";
   for (auto h : history) {
     ss << h;
   }
-  ss << "   { \"role\": \"user\", " << "  \"content\": \"" << prompt << "\" }"
-     << endl
+  ss << "   { \"role\": \"user\", " << "\"content\": \"" << prompt << "\" }"
      << "  ]"
      << "}";
   std::string json_data = ss.str();
@@ -326,6 +327,7 @@ void show_chat_help() {
   cout << COLOR::DEFAULT;
 }
 
+#ifndef LIBRARY_BUILD
 int main(int argc, char **argv) {
   int ret = parse_command_line_options(argc, argv, g_opt);
   if (ret != 0)
@@ -369,3 +371,4 @@ int main(int argc, char **argv) {
 
   return ret;
 }
+#endif
