@@ -1,12 +1,11 @@
 cc_binary(
     name = "ochat",
     srcs = [
-        "app_config.h",
-        "ochat.h",
-        "ochat.cpp",
+        "main.cpp",
     ],
  #   copts = [""],
     deps = [
+        ":ochat_lib",
         "@boost.json//:boost.json",
         "@boost.asio//:boost.asio",
     ],
@@ -16,9 +15,10 @@ cc_library(
     name = "ochat_lib",
     srcs = [
         "ochat.cpp",
+        "app_config.h",
     ],
     hdrs = ["app_config.h", "ochat.h"],
-    defines = ["LIBRARY_BUILD"],
+    defines = [],
     deps = [
         "@boost.json//:boost.json",
         "@boost.asio//:boost.asio", 

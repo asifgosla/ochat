@@ -13,16 +13,17 @@
 #define OLLAMA_SERVER_PORT 11434
 #define OLLAMA_ENDPOINT "/api/chat"
 #define OLLAMA_MODEL "llama3.2:1b"
+#define OLLAMA_STREAM_RESP true
 
 // Define colors for each context
-namespace COLOR {
-constexpr const char *ATTN = USE_COLORS ? "\033[31m" : "";   // red
-constexpr const char *AI = USE_COLORS ? "\033[32m" : "";     // green
-constexpr const char *WARN = USE_COLORS ? "\033[33m" : "";   // yellow
-constexpr const char *APP = USE_COLORS ? "\033[34m" : "";    // blue
-constexpr const char *USER = USE_COLORS ? "\033[0m" : "";    // default
-constexpr const char *DEFAULT = USE_COLORS ? "\033[0m" : ""; // default
-}; // namespace COLOR
+namespace COL {
+constexpr const char *ATN = USE_COLORS ? "\033[31m" : ""; // red
+constexpr const char *AI = USE_COLORS ? "\033[32m" : "";  // green
+constexpr const char *WRN = USE_COLORS ? "\033[33m" : ""; // yellow
+constexpr const char *APP = USE_COLORS ? "\033[34m" : ""; // blue
+constexpr const char *USR = USE_COLORS ? "\033[0m" : "";  // default
+constexpr const char *DEF = USE_COLORS ? "\033[0m" : "";  // default
+}; // namespace COL
 
 #define _STRINGIFY(x) #x
 #define STRINGIFY(x) _STRINGIFY(x)

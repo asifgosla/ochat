@@ -5,9 +5,7 @@
 #include <boost/asio.hpp>
 #include <boost/json/src.hpp> // must include from 1 source file, to eliminate need to link to boost
 #include <boost/json/string.hpp>
-#include <getopt.h>
 #include <iostream>
-#include <map>
 #include <sstream>
 #include <stdexcept> // Include for std::runtime_error
 #include <string>
@@ -17,25 +15,28 @@
 
 using namespace std;
 using boost::asio::ip::tcp;
+using namespace ochat;
 
-struct Options {
-  std::string endpoint;
-  std::string model;
-  bool debug;
-};
+// Get library options object reference
+Options &ochat::GetOptions() {
+  static ochat::Options opt{OLLAMA_ENDPOINT, OLLAMA_MODEL, OLLAMA_STREAM_RESP,
+                            ENABLE_DEBUG_LOG};
+  return opt;
+}
 
-Options g_opt{OLLAMA_ENDPOINT, OLLAMA_MODEL, ENABLE_DEBUG_LOG};
+// returns True if Dbg() is on
+bool Dbg() { return GetOptions().debug; }
 
 // function to return a post request message for the Ollama API
-std::string format_post_request(std::string prompt, std::string model_name,
-                                bool stream_resp, vector<string> &history) {
+std::string ochat::FormatPostRequest(std::string prompt,
+                                     vector<string> &history) {
 
   // format the JSON data for the Ollama request
   std::stringstream ss;
 
   ss << "{"
-     << "  \"model\": \"" << model_name << "\","
-     << "  \"stream\": " << (stream_resp ? "true" : "false") << ","
+     << "  \"model\": \"" << GetOptions().model << "\","
+     << "  \"stream\": " << (GetOptions().stream_resp ? "true" : "false") << ","
      << " \"messages\": [";
   for (auto h : history) {
     ss << h;
@@ -48,7 +49,7 @@ std::string format_post_request(std::string prompt, std::string model_name,
   // create the post request
   ss.str("");
   ss.clear();
-  ss << "POST " << g_opt.endpoint << " HTTP/1.1\r\n";
+  ss << "POST " << GetOptions().endpoint << " HTTP/1.1\r\n";
   ss << "Host: " << OLLAMA_SERVER_ADDR << "\r\n";
   ss << "Content-Type: application/json\r\n";
   ss << "Content-Length: " << json_data.size() << "\r\n";
@@ -60,7 +61,7 @@ std::string format_post_request(std::string prompt, std::string model_name,
 
 // Function to parse the HTTP response header
 std::map<std::string, std::string>
-parse_http_response_header(std::istream &responseStream) {
+ochat::ParseHttpRespHeader(std::istream &responseStream) {
   std::map<std::string, std::string> headers;
   std::string line;
 
@@ -77,7 +78,8 @@ parse_http_response_header(std::istream &responseStream) {
     std::string::size_type colon = line.find(':');
     if (colon != std::string::npos) {
       std::string headerName = line.substr(0, colon);
-      std::string headerValue = line.substr(colon + 2); // Skip ": "
+      std::string headerValue =
+          line.substr(colon + 2, line.size() - 1); // Skip ": "
       headers[headerName] = headerValue;
     }
   }
@@ -89,9 +91,9 @@ parse_http_response_header(std::istream &responseStream) {
 // delimeter sequence is in the stream.  If there was previously buffered data
 // in resp_buff that will be checked for the delimeter before requesting more
 // data from the socket.
-void read_until_delimeter(tcp::socket &socket,
-                          boost::asio::streambuf &resp_buff,
-                          const char *delim = "\r\n") {
+void ochat::ReadUntilDelimeter(tcp::socket &socket,
+                               boost::asio::streambuf &resp_buff,
+                               const char *delim = "\r\n") {
   if (resp_buff.size() > 0) {
     // check if the data is already buffered up to the next delimeter or if
     // we need to read more.
@@ -108,7 +110,7 @@ void read_until_delimeter(tcp::socket &socket,
 }
 
 // Parse the returned JSON data for the content string in the message object.
-std::string get_msg_content_from_json(std::string json_str) {
+std::string ochat::GetMsgContentFromJson(std::string json_str) {
   boost::json::value resp = boost::json::parse(json_str);
   boost::json::object resp_obj = resp.as_object();
   if (resp_obj.find("message") != resp_obj.end()) {
@@ -123,10 +125,10 @@ std::string get_msg_content_from_json(std::string json_str) {
 }
 
 // Send a request to an Ollama server and display its response.
-void SendRequestToAi(const string &req, vector<string> &history) {
+void ochat::SendRequestToAi(const string &req, vector<string> &history) {
   boost::json::string prompt(req.c_str(), req.size());
   std::stringstream output;
-  std::string endpoint = g_opt.endpoint;
+  std::string endpoint = GetOptions().endpoint;
 
   // create a connection to the Ollama host
   boost::asio::io_context io_context;
@@ -137,12 +139,9 @@ void SendRequestToAi(const string &req, vector<string> &history) {
   boost::asio::connect(socket, endpoints);
 
   // format and send the post request to the ollama server
-  bool stream_resp = true;
-  std::string post_req =
-      format_post_request(req, g_opt.model, stream_resp, history);
-  if (g_opt.debug) {
-    cout << COLOR::WARN << "POST Request: " << COLOR::DEFAULT << post_req
-         << endl;
+  std::string post_req = FormatPostRequest(req, history);
+  if (Dbg()) {
+    cout << COL::WRN << "POST Request: " << COL::DEF << post_req << endl;
     ::cout << post_req << endl;
   }
   boost::asio::write(socket, boost::asio::buffer(post_req));
@@ -156,10 +155,9 @@ void SendRequestToAi(const string &req, vector<string> &history) {
   boost::asio::read_until(socket, resp_buff, "\r\n\r\n", error);
 
   // parse the response header
-  auto res_map = parse_http_response_header(resp_strm);
-  if (g_opt.debug) {
-    cout << COLOR::WARN << "Parsed response headers: " << COLOR::DEFAULT
-         << endl;
+  auto res_map = ParseHttpRespHeader(resp_strm);
+  if (Dbg()) {
+    cout << COL::WRN << "Parsed response headers: " << COL::DEF << endl;
     for (auto [k, v] : res_map) {
       std::cout << k << " : " << v << endl;
     }
@@ -171,16 +169,15 @@ void SendRequestToAi(const string &req, vector<string> &history) {
   if (res_map.find("Transfer-Encoding") != res_map.end() &&
       res_map["Transfer-Encoding"] == "chunked\r") {
     chunked = true;
-    if (g_opt.debug) {
-      cout << COLOR::WARN << "Chunked encoding detected" << COLOR::DEFAULT
-           << endl;
+    if (Dbg()) {
+      cout << COL::WRN << "Chunked encoding detected" << COL::DEF << endl;
     }
   } else {
     if (res_map.find("Content-Length") != res_map.end()) {
       content_length = std::stoi(res_map["Content-Length"]);
-      if (g_opt.debug) {
-        cout << COLOR::WARN << "Content-Length header found: " << content_length
-             << COLOR::DEFAULT << endl;
+      if (Dbg()) {
+        cout << COL::WRN << "Content-Length header found: " << content_length
+             << COL::DEF << endl;
       }
     } else {
       throw std::runtime_error("No Content-Length header found in response");
@@ -189,7 +186,7 @@ void SendRequestToAi(const string &req, vector<string> &history) {
 
   std::string resp_body;
   if (chunked) {
-    cout << COLOR::AI << "AI: ";
+    cout << COL::AI << "AI: ";
     ;
     // Handle a chunked response:
     // payload of a chunked response starts with the length of the chunk in
@@ -198,12 +195,11 @@ void SendRequestToAi(const string &req, vector<string> &history) {
     // length of 0;
     while (true) {
       // Read the chunk length followed by "\r\n"
-      read_until_delimeter(socket, resp_buff, "\r\n");
+      ReadUntilDelimeter(socket, resp_buff, "\r\n");
       std::string csize_str;
       std::getline(resp_strm, csize_str);
-      if (g_opt.debug) {
-        cout << COLOR::WARN << "Chunk size: " << csize_str << COLOR::DEFAULT
-             << endl;
+      if (Dbg()) {
+        cout << COL::WRN << "Chunk size: " << csize_str << COL::DEF << endl;
       }
       size_t cs = std::stoul(csize_str, nullptr, 16);
 
@@ -225,13 +221,13 @@ void SendRequestToAi(const string &req, vector<string> &history) {
           boost::asio::buffer_cast<const char *>(resp_buff.data()), cs);
       resp_buff.consume(chunk.size());
       resp_body += chunk;
-      std::string msg = get_msg_content_from_json(chunk);
+      std::string msg = GetMsgContentFromJson(chunk);
       output << msg;
-      cout << COLOR::AI << msg;
+      cout << COL::AI << msg;
       cout.flush();
 
       // the trailing "\r\n" marks end of each chunk
-      read_until_delimeter(socket, resp_buff, "\r\n");
+      ReadUntilDelimeter(socket, resp_buff, "\r\n");
       std::string chunk_delim_buff(
           boost::asio::buffer_cast<const char *>(resp_buff.data()),
           resp_buff.size());
@@ -255,9 +251,9 @@ void SendRequestToAi(const string &req, vector<string> &history) {
     resp_body += std::string(boost::asio::buffers_begin(resp_buff.data()),
                              boost::asio::buffers_end(resp_buff.data()));
 
-    cout << COLOR::AI << "AI: " << resp_body << COLOR::DEFAULT << endl;
+    cout << COL::AI << "AI: " << resp_body << COL::DEF << endl;
     // Parse the returned JSON data for the message content.
-    output << get_msg_content_from_json(resp_body);
+    output << GetMsgContentFromJson(resp_body);
   }
 
   // save history (to maintain the chat context)
@@ -270,105 +266,3 @@ void SendRequestToAi(const string &req, vector<string> &history) {
           << "  \"content\": " << lastResponse << " }," << endl;
   history.push_back(newHist.str());
 }
-
-void show_usage_help() {
-  cout << COLOR::APP;
-  cout << "Help" << endl;
-  cout << "Usage: ochat [options]" << endl;
-  cout << "Options:" << endl;
-  cout << "  --debug - enable debug logs" << endl;
-  cout << "  --model=<model> - specify the AI model to use (default: "
-       << g_opt.model << ")" << endl;
-  cout << "  --help          - display help text" << endl;
-  cout << COLOR::DEFAULT;
-}
-
-// returns 0 on success, non-zero if failure
-int parse_command_line_options(int argc, char **argv, Options &opt) {
-  // Define the command-line options
-  static struct option long_options[] = {
-      {"debug", no_argument, nullptr, 'd'},
-      {"model", required_argument, nullptr, 'm'},
-      {"help", no_argument, nullptr, 'h'},
-      {0, 0, 0, 0}};
-
-  /// Parse the command line
-  int c;
-  while ((c = getopt_long(argc, argv, "m:", long_options, nullptr)) != -1) {
-    switch (c) {
-    case 'd': // enable debug logs
-      opt.debug = true;
-      break;
-    case 'm':
-      opt.model = std::string(optarg);
-      cout << COLOR::APP << "Selected Model: " << g_opt.model << COLOR::DEFAULT
-           << endl;
-      break;
-    case 'h':
-    default:
-      show_usage_help();
-      return 1;
-    }
-  }
-  return 0;
-}
-
-void show_chat_help() {
-  cout << COLOR::APP;
-  cout << "Help" << endl;
-  cout << "Enter a question for the AI, the following special commands are "
-          "supported:"
-       << endl;
-  cout << "  /bye - to exit" << endl;
-  cout << "  /new - start a new conversation and clear the chat context"
-       << endl;
-  cout << "  /debug - to enable debug" << endl;
-  cout << "  /help - for this help text" << endl;
-  cout << COLOR::DEFAULT;
-}
-
-#ifndef LIBRARY_BUILD
-int main(int argc, char **argv) {
-  int ret = parse_command_line_options(argc, argv, g_opt);
-  if (ret != 0)
-    return ret;
-
-  /// Initiate loop to handle user input and AI response
-  vector<string> history; // chat history to preserve context
-  cout << COLOR::APP << "Please enter a prompt for the AI or " << COLOR::WARN
-       << "/help" << COLOR::DEFAULT << " ,for help, " << COLOR::ATTN << "/bye"
-       << COLOR::APP << " , to exit" << COLOR::DEFAULT << endl;
-  std::string prompt;
-  cout << COLOR::USER << "PROMPT: ";
-  while (getline(cin, prompt)) {
-
-    if (prompt == "/help") {
-      show_chat_help();
-    } else if (prompt == "/new") {
-      cout << COLOR::APP
-           << "Starting a new conversation, clearing previous chat context"
-           << COLOR::DEFAULT << endl;
-      history.clear();
-    } else if (prompt == "/debug") {
-      g_opt.debug = !g_opt.debug;
-      cout << COLOR::ATTN << "Toggled Debug, g_opt.debug is now " << g_opt.debug
-           << COLOR::DEFAULT << endl;
-    } else if (prompt == "/bye") {
-      cout << COLOR::ATTN << "Exiting Chat..." << COLOR::DEFAULT << endl;
-      break;
-    } else {
-      try {
-        SendRequestToAi(prompt, history);
-
-      } catch (const std::runtime_error &e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
-        ret = 1;
-        break;
-      }
-    }
-    cout << COLOR::USER << "PROMPT: ";
-  }
-
-  return ret;
-}
-#endif
