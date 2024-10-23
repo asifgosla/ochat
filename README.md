@@ -2,7 +2,11 @@
 
 ## Overview
 
-Ochat is a C++ application to chat with an LLM using the Ollama APIs. Admittedly, this app is a bit contrived, as ollama already has chat functionality. However, the main purpose of this app is to demonstrate calling an Ollama REST API from C++, receiving the chunked post response, and processing the JSON response. Additionally it demonstrates the Bazel build system, Unit tests w/ Google Test, and Code Coverage.
+Ochat is a C++ application to chat with an LLM using the Ollama APIs. Admittedly, this app is a bit contrived, as Ollama already has chat functionality. However, the main purpose of this app is to demonstrate the following:
+
+- Calling an Ollama REST API from C++ and receiving a chunked response.
+- Processing JSON response
+- Using the Bazel build system, Unit tests with Google Test, and Code Coverage.
 
 ## Technologies
 
