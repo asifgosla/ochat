@@ -48,6 +48,12 @@ follow the following steps to run the unit tests with code coverage and generate
   - Note that I am running in a vscode dev container and if try and use the coverage.dat file from the default output location I get The error message _genhtml: ERROR: not a plain file: /home/vscode/.cache/bazel/..." indicates that the genhtml tool is unable to process the specified file because it is not a regular file._ This could be due to the /home/vscode not being a real directory but something created by the devcontainer. To workaround this issue I copied the file to my project directory in the above steps.
 - Open the file `.\coverage/index.html` in your browser to examine the code coverage report.
 
+### Mocking the Boost ASIO interfaces
+
+One of the things that was required to unit test this code was to implement mocks for interactions with the boost::asio socket read and write functions.
+The approach that was taken in this code was to leverage template specialization in the unit test build to allow intercepting the boost template functions
+that were needed for testing and having these functions forward the calls to the MockAsio class members. Note that using weak linkage does not work with template classes. This method was preferred over wrapping all the boost api calls in a class and using that from the production code - primarily to avoid cluttering the production code.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
