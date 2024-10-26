@@ -28,16 +28,29 @@ cc_library(
     ],
 )
 cc_test(
-    name = "ochat_test",
+    name = "ochat_format_test",
     srcs = [
-        "test/ochat_test.cpp",
-        "test/ochat_socket_test.cpp",
-        "test/mock_asio.h",
+        "test/ochat_format_test.cpp",
+        "test/ochat_test_f.h"
     ],
+    defines = ["UNIT_TESTING"],
     deps = [
         ":ochat_lib",
-        "@boost.json//:boost.json",
-        "@boost.asio//:boost.asio",
+        "@googletest//:gtest", 
+        "@googletest//:gtest_main",
+    ],
+    size = "small",
+)
+cc_test(
+    name = "ochat_asio_test",
+    srcs = [
+        "test/ochat_asio_test.cpp",
+        "test/mock_asio.h",
+        "test/ochat_test_f.h"
+    ],
+    defines = ["UNIT_TESTING"],
+    deps = [
+        ":ochat_lib",
         "@googletest//:gtest", 
         "@googletest//:gtest_main",
     ],

@@ -16,30 +16,17 @@ using namespace std;
 using boost::asio::ip::tcp;
 using namespace ochat;
 
-#define OSTRM (*(GetOptions().ostrm))
-
 namespace ochat {
-
-// Get library options object reference
-Options &GetOptions() {
-  static Options opt{OLLAMA_SERVER_ADDR, OLLAMA_SERVER_PORT, OLLAMA_ENDPOINT,
-                     OLLAMA_MODEL,       OLLAMA_STREAM_RESP, ENABLE_DEBUG_LOG,
-                     &std::cout};
-  return opt;
-}
-
-// returns True if Dbg() is on
-bool Dbg() { return GetOptions().debug; }
-
 // function to return a post request message for the Ollama API
-std::string FormatPostRequest(std::string prompt, vector<string> &history) {
+std::string OllamaChat::FormatPostRequest(std::string prompt,
+                                          vector<string> &history) {
 
   // format the JSON data for the Ollama request
   std::stringstream ss;
 
   ss << "{"
-     << "  \"model\": \"" << GetOptions().model << "\","
-     << "  \"stream\": " << (GetOptions().stream_resp ? "true" : "false") << ","
+     << "  \"model\": \"" << opt_.model << "\","
+     << "  \"stream\": " << (opt_.stream_resp ? "true" : "false") << ","
      << " \"messages\": [";
   for (auto h : history) {
     ss << h;
@@ -52,8 +39,8 @@ std::string FormatPostRequest(std::string prompt, vector<string> &history) {
   // create the post request
   ss.str("");
   ss.clear();
-  ss << "POST " << GetOptions().endpoint << " HTTP/1.1\r\n";
-  ss << "Host: " << GetOptions().server << "\r\n";
+  ss << "POST " << opt_.endpoint << " HTTP/1.1\r\n";
+  ss << "Host: " << opt_.server << "\r\n";
   ss << "Content-Type: application/json\r\n";
   ss << "Content-Length: " << json_data.size() << "\r\n";
   ss << "\r\n";
@@ -64,7 +51,7 @@ std::string FormatPostRequest(std::string prompt, vector<string> &history) {
 
 // Function to parse the HTTP response header
 std::map<std::string, std::string>
-ParseHttpRespHeader(std::istream &responseStream) {
+OllamaChat::ParseHttpRespHeader(std::istream &responseStream) {
   std::map<std::string, std::string> headers;
   std::string line;
 
@@ -94,8 +81,9 @@ ParseHttpRespHeader(std::istream &responseStream) {
 // the delimeter sequence is in the stream.  If there was previously buffered
 // data in resp_buff that will be checked for the delimeter before requesting
 // more data from the socket.
-void ReadUntilDelimeter(tcp::socket &socket, boost::asio::streambuf &resp_buff,
-                        const char *delim = "\r\n") {
+void OllamaChat::ReadUntilDelimeter(tcp::socket &socket,
+                                    boost::asio::streambuf &resp_buff,
+                                    const char *delim = "\r\n") {
   if (resp_buff.size() > 0) {
     // check if the data is already buffered up to the next delimeter or if
     // we need to read more.
@@ -112,7 +100,7 @@ void ReadUntilDelimeter(tcp::socket &socket, boost::asio::streambuf &resp_buff,
 }
 
 // Parse the returned JSON data for the content string in the message object.
-std::string GetMsgContentFromJson(std::string json_str) {
+std::string OllamaChat::GetMsgContentFromJson(std::string json_str) {
   boost::json::value resp = boost::json::parse(json_str);
   boost::json::object resp_obj = resp.as_object();
   if (resp_obj.find("message") != resp_obj.end()) {
@@ -127,24 +115,23 @@ std::string GetMsgContentFromJson(std::string json_str) {
 }
 
 // Send a request to an Ollama server and display its response.
-void SendRequestToAi(const string &req, vector<string> &history) {
+void OllamaChat::SendRequestToAi(const string &req) {
   boost::json::string prompt(req.c_str(), req.size());
   std::stringstream output;
-  std::string endpoint = GetOptions().endpoint;
+  std::string endpoint = opt_.endpoint;
 
   // create a connection to the Ollama host
   boost::asio::io_context io_context;
   tcp::resolver resolver(io_context);
-  auto endpoints =
-      resolver.resolve(GetOptions().server, std::to_string(GetOptions().port));
+  auto endpoints = resolver.resolve(opt_.server, std::to_string(opt_.port));
   tcp::socket socket(io_context);
   boost::asio::connect(socket, endpoints);
 
   // format and send the post request to the ollama server
-  std::string post_req = FormatPostRequest(req, history);
-  if (Dbg()) {
-    OSTRM << COL::WRN << "POST Request: " << COL::DEF << post_req << endl;
-    OSTRM << post_req << endl;
+  std::string post_req = FormatPostRequest(req, history_);
+  if (opt_.debug) {
+    os_ << COL::WRN << "POST Request: " << COL::DEF << post_req << endl;
+    os_ << post_req << endl;
   }
   boost::asio::write(socket, boost::asio::buffer(post_req));
 
@@ -158,10 +145,10 @@ void SendRequestToAi(const string &req, vector<string> &history) {
 
   // parse the response header
   auto res_map = ParseHttpRespHeader(resp_strm);
-  if (Dbg()) {
-    OSTRM << COL::WRN << "Parsed response headers: " << COL::DEF << endl;
+  if (opt_.debug) {
+    os_ << COL::WRN << "Parsed response headers: " << COL::DEF << endl;
     for (auto [k, v] : res_map) {
-      OSTRM << k << " : " << v << endl;
+      os_ << k << " : " << v << endl;
     }
   }
 
@@ -171,15 +158,15 @@ void SendRequestToAi(const string &req, vector<string> &history) {
   if (res_map.find("Transfer-Encoding") != res_map.end() &&
       res_map["Transfer-Encoding"] == "chunked\r") {
     chunked = true;
-    if (Dbg()) {
-      OSTRM << COL::WRN << "Chunked encoding detected" << COL::DEF << endl;
+    if (opt_.debug) {
+      os_ << COL::WRN << "Chunked encoding detected" << COL::DEF << endl;
     }
   } else {
     if (res_map.find("Content-Length") != res_map.end()) {
       content_length = std::stoi(res_map["Content-Length"]);
-      if (Dbg()) {
-        OSTRM << COL::WRN << "Content-Length header found: " << content_length
-              << COL::DEF << endl;
+      if (opt_.debug) {
+        os_ << COL::WRN << "Content-Length header found: " << content_length
+            << COL::DEF << endl;
       }
     } else {
       throw std::runtime_error("No Content-Length header found in response");
@@ -188,7 +175,7 @@ void SendRequestToAi(const string &req, vector<string> &history) {
 
   std::string resp_body;
   if (chunked) {
-    OSTRM << COL::AI << "AI: ";
+    os_ << COL::AI << "AI: ";
     ;
     // Handle a chunked response:
     // payload of a chunked response starts with the length of the chunk in
@@ -200,13 +187,13 @@ void SendRequestToAi(const string &req, vector<string> &history) {
       ReadUntilDelimeter(socket, resp_buff, "\r\n");
       std::string csize_str;
       std::getline(resp_strm, csize_str);
-      if (Dbg()) {
-        OSTRM << COL::WRN << "Chunk size: " << csize_str << COL::DEF << endl;
+      if (opt_.debug) {
+        os_ << COL::WRN << "Chunk size: " << csize_str << COL::DEF << endl;
       }
       size_t cs = std::stoul(csize_str, nullptr, 16);
 
       if (cs == 0) {
-        OSTRM << endl;
+        os_ << endl;
         break; // End of chunked responses (this is the last chunk)
       }
 
@@ -225,8 +212,8 @@ void SendRequestToAi(const string &req, vector<string> &history) {
       resp_body += chunk;
       std::string msg = GetMsgContentFromJson(chunk);
       output << msg;
-      OSTRM << COL::AI << msg;
-      OSTRM.flush();
+      os_ << COL::AI << msg;
+      os_.flush();
 
       // the trailing "\r\n" marks end of each chunk
       ReadUntilDelimeter(socket, resp_buff, "\r\n");
@@ -253,7 +240,7 @@ void SendRequestToAi(const string &req, vector<string> &history) {
     resp_body += std::string(boost::asio::buffers_begin(resp_buff.data()),
                              boost::asio::buffers_end(resp_buff.data()));
 
-    OSTRM << COL::AI << "AI: " << resp_body << COL::DEF << endl;
+    os_ << COL::AI << "AI: " << resp_body << COL::DEF << endl;
     // Parse the returned JSON data for the message content.
     output << GetMsgContentFromJson(resp_body);
   }
@@ -266,7 +253,9 @@ void SendRequestToAi(const string &req, vector<string> &history) {
           << endl;
   newHist << " { \"role\": \"assistant\", "
           << "  \"content\": " << lastResponse << " }," << endl;
-  history.push_back(newHist.str());
+  history_.push_back(newHist.str());
 }
+
+void OllamaChat::ResetContext() { history_.clear(); }
 
 } // namespace ochat

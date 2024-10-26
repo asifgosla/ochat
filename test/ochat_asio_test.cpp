@@ -1,28 +1,26 @@
+// This file contains unit tests for functions in the ochat module that utilize
+// boost::asio. The tests cover various functionalities such as sending and
+// receiving messages, handling errors, and managing connections.
+//
 #include "app_config.h"
 #include "mock_asio.h"
 #include "ochat.h"
+#include "ochat_test_f.h"
 #include <gmock/gmock.h> // Brings in gMock.
 #include <gtest/gtest.h>
 #include <iostream>
 #include <string>
 #include <vector>
+
 using namespace std;
 using namespace testing;
+
+using OllamaChatTest_F = testing::OllamaChatTest_F;
 
 // Fake boost streambuf for testing purposes
 class FakeBBuf : public boost::asio::streambuf {
 public:
   FakeBBuf(string str) {}
-};
-
-MockAsio *g_mock_asio = nullptr;
-
-class OchatAsioTest : public ::testing::Test {
-protected:
-  OchatAsioTest() { g_mock_asio = &asio_; }
-  ~OchatAsioTest() { g_mock_asio = nullptr; };
-
-  MockAsio asio_;
 };
 
 MATCHER(BufIsEmpty, "Checks if the buffer's size is 0") {
@@ -40,7 +38,8 @@ TEST(ReadUntilDelimeterTest, CheckValidDelim) {
     BSocket socket(io_context);
     FakeBBuf buff("");
     MockAsio mock_asio;
-    g_mock_asio = &mock_asio;
+    std::stringstream ss;
+    OllamaChatTest_F oc(ochat::Options(), ss);
 
     // Set up the expectation for the asio call.
     std::string resp{
@@ -53,7 +52,8 @@ TEST(ReadUntilDelimeterTest, CheckValidDelim) {
           os << resp;
           return resp.size(); // Return the number of bytes written
         });
-    ochat::ReadUntilDelimeter(socket, buff, "\r\n");
+
+    oc.ReadUntilDelimeter(socket, buff, "\r\n");
     std::istream rs(&buff);
     std::string resp_line;
     std::getline(rs, resp_line);
@@ -67,18 +67,18 @@ TEST(SendRequestToAiTest, ContentLength) {
 
   try {
     // setup for call
-    ochat::Options &opt = ochat::GetOptions();
+    ochat::Options opt;
     opt.stream_resp = false;
     opt.debug = true;
     opt.server = "localhost";
     opt.port = 8000;
+    opt.model = "davinci";
     std::stringstream ss;
-    opt.ostrm = &ss;
-    vector<string> history;
+    OllamaChatTest_F oc(opt, ss);
+
     std::string req = "Hi!";
     FakeBBuf buff("");
     MockAsio mock_asio;
-    g_mock_asio = &mock_asio;
 
     std::string resp{"HTTP/1.1 200 OK\r\nContent-Length: "
                      "13\r\n\r\n{\"message\":{\"content\":\"Hello, World!\"}}"};
@@ -100,7 +100,13 @@ TEST(SendRequestToAiTest, ContentLength) {
           os << resp;
           return resp.size(); // Return the number of bytes written
         });
-    ochat::SendRequestToAi(req, history);
+
+    std::vector<std::string> &history = oc.GetHistoryObj();
+    EXPECT_EQ(history.size(), 0);
+    oc.SendRequestToAi(req);
+    EXPECT_EQ(history.size(), 1);
+    oc.ResetContext();
+    EXPECT_EQ(history.size(), 0);
 
   } catch (...) {
     FAIL() << "Exception Failure" << endl;
@@ -110,18 +116,17 @@ TEST(SendRequestToAiTest, ContentLength) {
 TEST(SendRequestToAiTest, ChunkedResp) {
   try {
     // setup for call
-    ochat::Options &opt = ochat::GetOptions();
+    ochat::Options opt;
     opt.debug = true;
     opt.server = "localhost";
     opt.port = 8000;
     opt.stream_resp = true;
     std::stringstream ss;
-    opt.ostrm = &ss;
-    vector<string> history;
+    OllamaChatTest_F oc(opt, ss);
+
     std::string req = "Hi!";
     FakeBBuf buff("");
     MockAsio mock_asio;
-    g_mock_asio = &mock_asio;
 
     // Note that the response is split into multiple chunks of data.
     // the chunk boundaries are chosen to excercise the different code paths in
@@ -161,11 +166,45 @@ TEST(SendRequestToAiTest, ChunkedResp) {
             });
 
     // call the api being tested
-    ochat::SendRequestToAi(req, history);
+    oc.SendRequestToAi(req);
 
   } catch (...) {
     FAIL() << "Exception Failure" << endl;
   }
 }
+
 // add error case, not chunked and no Content-Length (throws
 // std::runtime_error("No Content-Length header found in response"))
+TEST(SendRequestToAiTest, CheckHeaderMissingLengthNotChunked) {
+  // setup for call
+  ochat::Options opt;
+  opt.stream_resp = false;
+  opt.debug = false;
+  opt.server = "localhost";
+  opt.port = 8000;
+  std::stringstream ss;
+  OllamaChatTest_F oc(opt, ss);
+
+  std::string req = "Hi!";
+  FakeBBuf buff("");
+  MockAsio mock_asio;
+
+  std::string resp{"HTTP/1.1 200 OK\r\n"
+                   "\r\n\r\n{\"message\":{\"content\":\"Hello, World!\"}}"};
+  std::string expected_post =
+      "POST /api/chat HTTP/1.1\r\nHost: localhost\r\nContent-Type: "
+      "application/json\r\nContent-Length: 97\r\n\r\n{  \"model\": "
+      "\"davinci\",  \"stream\": false, \"messages\": [   { \"role\": "
+      "\"user\", \"content\": \"Hi!\" }  ]}";
+
+  EXPECT_CALL(mock_asio, write(_, _));
+  EXPECT_CALL(mock_asio, read_until(_, BufIsEmpty(), _))
+      .WillOnce(
+          [&buff, resp](BSocket & /*s*/, BStreamBuf &b, string_view /*delim*/) {
+            // Write data into  buffer to simulate reading from socket
+            std::ostream os(&b);
+            os << resp;
+            return resp.size(); // Return the number of bytes written
+          });
+  EXPECT_THROW(oc.SendRequestToAi(req), std::runtime_error);
+}

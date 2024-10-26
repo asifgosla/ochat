@@ -23,7 +23,8 @@ Ochat is a C++ application to chat with an LLM using the Ollama APIs. Admittedly
 
 - bazel is required to build this project.
   - refer to this [link](https://github.com/asifgosla/gtest-example?tab=readme-ov-file#install-bazel) for installation instructions.
-- boost::asio, boost::json - this will automatically be installed by bazel when building the project.
+- gTest, gMock - these are automatically downloaded by bazel when building the project.
+- boost::asio, boost::json - thes are automatically be downloaded by bazel when building the project.
 - ollama - this can be downloaded from https://ollama.ai/download and needs to be installed locally.
 
 ## Tests and Code Coverage
@@ -41,12 +42,18 @@ follow the following steps to run the unit tests with code coverage and generate
 - `sudo apt-get update && sudo apt-get install lcov`
 - create a coverage subdirector under `ochat` directory.
 
-2. Run the tests and collect coverage data by running the following command in the `ochat` directory:
+2. Run the tests and collect coverage
 
-- `bazel test --collect_code_coverage --test_output=all //...`
-- `cp $(bazel info bazel-testlogs)/ochat_test/coverage.dat .`
-- `genhtml ./coverage.dat -o coverage`
-  - Note that I am running in a vscode dev container and if try and use the coverage.dat file from the default output location I get The error message _genhtml: ERROR: not a plain file: /home/vscode/.cache/bazel/..." indicates that the genhtml tool is unable to process the specified file because it is not a regular file._ This could be due to the /home/vscode not being a real directory but something created by the devcontainer. To workaround this issue I copied the file to my project directory in the above steps.
+- For combined code coverage data across all tests, run the script `./runtests_with_coverage.sh` from the `ochat` directory. This will generate a combined coverage report under `ochat/coverage` directory.
+
+- Alternatively, to run a single test with coverage, issue the following commands from the `ochat` directory:
+
+  - `bazel test --collect_code_coverage --test_output=all //:ochat_format_test`
+  - `cp $(bazel info bazel-testlogs)/ochat_format_test/coverage.dat .`
+  - `genhtml ./coverage.dat -o coverage`
+
+  ##### Note that I am running in a vscode dev container and if try and use the coverage.dat file from the default output location I get The error message _genhtml: ERROR: not a plain file: /home/vscode/.cache/bazel/..." indicates that the genhtml tool is unable to process the specified file because it is not a regular file._ This could be due to the /home/vscode not being a real directory but something created by the devcontainer. To workaround this issue I copied the file to my project directory in the above steps.
+
 - Open the file `.\coverage/index.html` in your browser to examine the code coverage report.
 
 ### Mocking the Boost ASIO interfaces

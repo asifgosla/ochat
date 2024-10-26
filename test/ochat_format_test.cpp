@@ -1,18 +1,28 @@
+// This file contains unit tests for the ochat module for functions that
+// performing formatting and parsing.
+//
 #include "app_config.h"
 #include "ochat.h"
+#include "ochat_test_f.h"
 #include <gtest/gtest.h>
 #include <iostream>
 #include <string>
 #include <vector>
+
+using OllamaChatTest_F = testing::OllamaChatTest_F;
+
+// Mock an input stream for testing purposes
+class FakeInputStream : public std::stringstream {
+public:
+  FakeInputStream(std::string str) : std::stringstream(str) {}
+};
 
 TEST(OchatTest, TestStringify) {
   EXPECT_EQ(std::string(STRINGIFY(314)), std::string("314"));
 }
 
 TEST(FormatRequestTest, Basic) {
-  ochat::Options &opt = ochat::GetOptions();
-  opt.model = "davinci";
-  opt.stream_resp = false;
+  // Setup for the function to test
   std::string prompt = "Hello, how are you?";
   std::vector<std::string> history;
   history.push_back(
@@ -36,24 +46,24 @@ TEST(FormatRequestTest, Basic) {
 
   std::string expected = hdr + body;
 
-  EXPECT_EQ(ochat::FormatPostRequest(prompt, history), expected);
-}
+  // call the function to test and check the results
+  ochat::Options opt;
+  opt.model = "davinci";
+  opt.stream_resp = false;
+  OllamaChatTest_F oc(opt);
 
-// Mock an input stream for testing purposes
-class MockInputStream : public std::stringstream {
-public:
-  MockInputStream(std::string str) : std::stringstream(str) {}
-};
+  EXPECT_EQ(oc.FormatPostRequest(prompt, history), expected);
+}
 
 TEST(ParseHttpRespHeaderTest, CompleteHttpResponse) {
   std::string response = "HTTP/1.1 200 OK\r\n"
                          "Content-Type: application/json\r\n"
                          "Date: Mon, 27 Jul 2009 12:28:53 GMT\r\n"
                          "\r\n";
-  MockInputStream input(response);
+  FakeInputStream input(response);
 
-  std::map<std::string, std::string> headers =
-      ochat::ParseHttpRespHeader(input);
+  OllamaChatTest_F oc;
+  std::map<std::string, std::string> headers = oc.ParseHttpRespHeader(input);
 
   EXPECT_EQ(headers["Status"], "HTTP/1.1 200 OK\r");
   EXPECT_EQ(headers["Content-Type"], "application/json\r");
@@ -63,10 +73,10 @@ TEST(ParseHttpRespHeaderTest, CompleteHttpResponse) {
 TEST(ParseHttpRespHeaderTest, StatusLineWithSpaces) {
   std::string response = "HTTP/1.1 200 OK\r\n"
                          "\r\n";
-  MockInputStream input(response);
+  FakeInputStream input(response);
 
-  std::map<std::string, std::string> headers =
-      ochat::ParseHttpRespHeader(input);
+  OllamaChatTest_F oc;
+  std::map<std::string, std::string> headers = oc.ParseHttpRespHeader(input);
 
   EXPECT_EQ(headers["Status"], "HTTP/1.1 200 OK\r");
 }
@@ -77,10 +87,10 @@ TEST(ParseHttpRespHeaderTest, InvalidHeader) {
                          "Date: Mon, 27 Jul 2009 12:28:53 GMT\r\n"
                          "Invalid-Header\r\n"
                          "\r\n";
-  MockInputStream input(response);
+  FakeInputStream input(response);
 
-  std::map<std::string, std::string> headers =
-      ochat::ParseHttpRespHeader(input);
+  OllamaChatTest_F oc;
+  std::map<std::string, std::string> headers = oc.ParseHttpRespHeader(input);
 
   EXPECT_EQ(headers["Status"], "HTTP/1.1 200 OK\r");
   EXPECT_EQ(headers["Content-Type"], "application/json\r");
@@ -89,21 +99,20 @@ TEST(ParseHttpRespHeaderTest, InvalidHeader) {
 
 TEST(ParseHttpRespHeaderTest, EmptyResponse) {
   std::string response = "";
-  MockInputStream input(response);
+  FakeInputStream input(response);
 
-  std::map<std::string, std::string> headers =
-      ochat::ParseHttpRespHeader(input);
+  OllamaChatTest_F oc;
+  std::map<std::string, std::string> headers = oc.ParseHttpRespHeader(input);
 
   EXPECT_TRUE(headers.empty());
 }
 
 TEST(ParseHttpRespHeaderTest, NoHeaders) {
-  std::string response = "HTTP/1.1 200 OK\r\n"
-                         "\r\n";
-  MockInputStream input(response);
+  std::string response = "HTTP/1.1 200 OK\r\n\r\n";
+  FakeInputStream input(response);
 
-  std::map<std::string, std::string> headers =
-      ochat::ParseHttpRespHeader(input);
+  OllamaChatTest_F oc;
+  std::map<std::string, std::string> headers = oc.ParseHttpRespHeader(input);
 
   EXPECT_EQ(headers["Status"], "HTTP/1.1 200 OK\r");
 }
@@ -116,7 +125,8 @@ TEST(GetMsgContentFromJsonTest, MissingContent) {
         }
     )";
 
-  EXPECT_TRUE(ochat::GetMsgContentFromJson(json_str).empty());
+  OllamaChatTest_F oc;
+  EXPECT_TRUE(oc.GetMsgContentFromJson(json_str).empty());
 }
 
 // Test case: JSON with missing message
@@ -127,18 +137,23 @@ TEST(GetMsgContentFromJsonTest, MissingMessage) {
         }
     )";
 
-  EXPECT_TRUE(ochat::GetMsgContentFromJson(json_str).empty());
+  OllamaChatTest_F oc;
+  EXPECT_TRUE(oc.GetMsgContentFromJson(json_str).empty());
 }
 
 // Test case: Empty JSON
 TEST(GetMsgContentFromJsonTest, EmptyJson) {
   std::string json_str = "{}";
-  EXPECT_TRUE(ochat::GetMsgContentFromJson(json_str).empty());
+
+  OllamaChatTest_F oc;
+  EXPECT_TRUE(oc.GetMsgContentFromJson(json_str).empty());
 }
 
 // Test case: JSON with invalid format
 TEST(GetMsgContentFromJsonTest, InvalidJson) {
   std::string json_str = "invalid_json_string";
-  EXPECT_THROW(ochat::GetMsgContentFromJson(json_str),
+
+  OllamaChatTest_F oc;
+  EXPECT_THROW(oc.GetMsgContentFromJson(json_str),
                boost::wrapexcept<boost::system::system_error>);
 }

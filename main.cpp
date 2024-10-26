@@ -62,13 +62,13 @@ void show_chat_help() {
 }
 
 int main(int argc, char **argv) {
-  ochat::Options &opt = ochat::GetOptions();
+  ochat::Options opt;
   int ret = ParseOptions(argc, argv, opt);
   if (ret != 0)
     return ret;
+  ochat::OllamaChat oc(opt);
 
   /// Initiate loop to handle user input and AI response
-  vector<string> history; // chat history to preserve context
   cout << COL::APP << "Please enter a prompt for the AI or " << COL::WRN
        << "/help" << COL::DEF << " ,for help, " << COL::ATN << "/bye"
        << COL::APP << " , to exit" << COL::DEF << endl;
@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
       cout << COL::APP
            << "Starting a new conversation, clearing previous chat context"
            << COL::DEF << endl;
-      history.clear();
+      oc.ResetContext();
     } else if (prompt == "/debug") {
       opt.debug = !opt.debug;
       cout << COL::ATN << "Toggled Debug, debug is now " << opt.debug
@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
       break;
     } else {
       try {
-        ochat::SendRequestToAi(prompt, history);
+        oc.SendRequestToAi(prompt);
 
       } catch (const std::runtime_error &e) {
         std::cerr << "Exception: " << e.what() << std::endl;

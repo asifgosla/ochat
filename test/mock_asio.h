@@ -1,3 +1,8 @@
+// This file contains the mocks and interceptors for boost asio functions.
+//
+#ifndef __MOCK_ASIO_HPP__
+#define __MOCK_ASIO_HPP__
+
 #include <boost/asio.hpp>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -19,6 +24,15 @@ using BConstBufSeqType = boost::asio::mutable_buffers_1;
 // Mock boost::asio interfaces for testing purposes
 class MockAsio {
 public:
+  MockAsio() {
+    assert(inst_ == nullptr); // shouldn't be another instance
+    inst_ = this;             // set this instance as the global one
+  }
+  ~MockAsio() {
+    assert(inst_ == this);
+    inst_ = nullptr;
+  }
+
   MOCK_METHOD(std::size_t, read,
               (BSyncRdStream & s, BStreamBuf &b, BCompletionCond cc));
   MOCK_METHOD(std::size_t, read_until,
@@ -27,33 +41,41 @@ public:
               (BSocket & s, BStreamBuf &b, std::string_view delim, BError &ec));
   MOCK_METHOD(std::size_t, write,
               (BSyncWrStream & s, const BConstBufSeqType &b));
+
+  // return the current instance of the MockAsio class
+  static MockAsio &inst() {
+    assert(inst_ != nullptr); // can only call when there is valid instance
+    return *inst_;
+  }
+
+private:
+  static MockAsio *inst_; // pointer to current instance of MockAsio if any.
 };
 
-extern MockAsio *g_mock_asio;
+MockAsio *MockAsio::inst_ = nullptr;
 
-// Interceptors for boost asio interfaces that are templates.
-// Intercept the boost::asio::read_until functions here and forward to the mock.
-// This boost functions are templates and the template specialization here for
-// those functions overrides the general template function definition in the
-// boost library.
+// These are Interceptor functions for boost asio template functions.The
+// interceptor functions use template specializationto overrides the general
+// template function definition in the boost library.  With this override, the
+// interceptors are able to forward the request to the MockAsio instance.
 namespace boost {
 namespace asio {
 
 template <>
 std::size_t read(BSyncRdStream &s, BStreamBuf &b,
                  BCompletionCond completion_condition) {
-  return g_mock_asio->read(s, b, completion_condition);
+  return MockAsio::inst().read(s, b, completion_condition);
 }
 
 template <>
 std::size_t read_until(BSocket &s, BStreamBuf &b, string_view delim) {
-  return g_mock_asio->read_until(s, b, delim);
+  return MockAsio::inst().read_until(s, b, delim);
 }
 
 template <>
 std::size_t read_until(BSocket &s, BStreamBuf &b, string_view delim,
                        BError &ec) {
-  return g_mock_asio->read_until(s, b, delim, ec);
+  return MockAsio::inst().read_until(s, b, delim, ec);
 }
 
 template <>
@@ -73,8 +95,10 @@ std::size_t write(
     BSyncWrStream &s, const BConstBufSeqType &b,
     typename boost::asio::constraint<
         boost::asio::is_const_buffer_sequence<BConstBufSeqType>::value>::type) {
-  return g_mock_asio->write(s, b);
+  return MockAsio::inst().write(s, b);
 }
 
 } // namespace asio
 } // namespace boost
+
+#endif // __MOCK_ASIO_HPP__
